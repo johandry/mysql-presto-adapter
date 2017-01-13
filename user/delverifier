@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+if [[ "${REEVE_TAG_PRESTO_ADAPTER}" != "mysql" ]]; then
+  echo "I'm not a Presto MySQL Adapter node, ignoring delete verifier event."
+  exit 0
+fi
+
+# Installing Presto Verifier
+SQLUSER='prestoverifier'
+SQL_PRESTO_VERIFIER=$(cat <<EOSQL
+USE presto_verifier;
+DROP TABLE IF EXISTS verifier_queries;
+DROP DATABASE IF EXISTS presto_verifier;
+DROP USER IF EXISTS '${SQLUSER}'@'%';
+EOSQL
+)
+
+echo ${SQL_PRESTO_VERIFIER} | mysql --defaults-extra-file=/root/.mysql/.config.cnf
+
+if ! mysql --defaults-extra-file=/root/.mysql/.config.cnf -e "SHOW DATABASES;" | grep -q presto_verifier; then
+  echo "DONE"
+else
+  echo "FAIL"
+  exit 1
+fi

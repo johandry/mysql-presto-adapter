@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+if [[ "${REEVE_TAG_PRESTO_ADAPTER}" != "mysql" ]]; then
+  echo "I'm not a Presto MySQL Adapter node, ignoring set verifier event."
+  exit 0
+fi
+
+# Installing Presto Verifier
+SQLUSER='prestoverifier'
+SQLPASSWORD='P@55word'
+SQL_PRESTO_VERIFIER=$(cat <<EOSQL
+CREATE DATABASE IF NOT EXISTS presto_verifier;
+GRANT ALL PRIVILEGES ON presto_verifier.* TO '${SQLUSER}'@'%' IDENTIFIED BY '${SQLPASSWORD}';
+FLUSH PRIVILEGES;
+USE presto_verifier;
+CREATE TABLE IF NOT EXISTS verifier_queries(
+    id INT NOT NULL AUTO_INCREMENT,
+    suite VARCHAR(256) NOT NULL,
+    name VARCHAR(256),
+    test_catalog VARCHAR(256) NOT NULL,
+    test_schema VARCHAR(256) NOT NULL,
+    test_prequeries TEXT,
+    test_query TEXT NOT NULL,
+    test_postqueries TEXT,
+    test_username VARCHAR(256) NOT NULL default 'verifier-test',
+    test_password VARCHAR(256),
+    control_catalog VARCHAR(256) NOT NULL,
+    control_schema VARCHAR(256) NOT NULL,
+    control_prequeries TEXT,
+    control_query TEXT NOT NULL,
+    control_postqueries TEXT,
+    control_username VARCHAR(256) NOT NULL default 'verifier-test',
+    control_password VARCHAR(256),
+    session_properties_json TEXT,
+    PRIMARY KEY (id)
+);
+EOSQL
+)
+
+echo ${SQL_PRESTO_VERIFIER} | mysql --defaults-extra-file=/root/.mysql/.config.cnf
+
+if mysql --defaults-extra-file=/root/.mysql/.config.cnf -e "SHOW DATABASES;" | grep -q presto_verifier; then
+  echo "DONE"
+else
+  echo "FAIL"
+  exit 1
+fi

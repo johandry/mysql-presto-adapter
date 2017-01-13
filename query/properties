@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+if [[ -z "${REEVE_TAG_MYSQL_ROLE}" ]]; then
+  echo "I'm not a MySQL node, ignoring properties request."
+  exit 0
+fi
+
+if [[ "${REEVE_TAG_PRESTO_ADAPTER}" != "mysql" ]]; then
+  echo "I'm not a Presto MySQL Adapter node, ignoring properties request."
+  exit 0
+fi
+
+# Identify local IP address
+ipAddr=
+getIPAddr() {
+  # If this is a container, this is the way to get the IP address
+  ipAddr=$(grep $HOSTNAME /etc/hosts 2>/dev/null| cut -f1)
+  [[ -n $ipAddr ]] && return 0
+
+  # Other option with ping, for containers and hosts:
+  ipAddr=$(ping -q -c 1 $(hostname) | head -1 | sed 's/.* (\(.*\)):.*/\1/')
+  [[ -n $ipAddr ]] && return 0
+
+  # If this is not a container, then it is a linux server
+  ipAddr=$(ip addr show eth0 2>/dev/null | grep "inet " | awk '{print $2}' | cut -d/ -f1)
+  [[ -n $ipAddr ]] && return 0
+
+  ipAddr=$(ifconfig eth0 | grep "inet " | awk '{print $2}' | cut -d: -f2)
+  [[ -n $ipAddr ]] && return 0
+
+  return 1
+}
+getIPAddr || (
+  echo "Cannot get my IP address."
+  (( $keeptmp )) && rm $tmpfile
+  exit 0
+)
+
+echo -n "connector.name=mysql;"
+echo -n "connection-url=jdbc:mysql://${ipAddr}:3306;"
+echo -n "connection-user=root;"
+echo -n "connection-password=$(grep password /root/.mysql/.config.cnf | cut -f2 -d= | tr -d ' ');"
